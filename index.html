@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crafto - Status & Video Maker</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#60A5FA">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="https://via.placeholder.com/192/60A5FA/ffffff?text=G">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+</head>
+
+<body>
+    <div id="app-container">
+        <!-- Splash Screen -->
+        <div id="splash-screen" style="background: linear-gradient(135deg, #e0eafc, #cfdef3);">
+            <div style="text-align: center; animation: pulse 2s infinite;">
+                <h1
+                    style="font-size: 3.5rem; margin-bottom: 0; color: #3B82F6; font-weight: 800; letter-spacing: -2px;">
+                    CRAFTO</h1>
+                <p style="letter-spacing: 2px; font-weight: 400; color: #1e293b; opacity: 0.7;">MODERN STATUS</p>
+            </div>
+        </div>
+
+        <!-- Auth / Login View -->
+        <div id="auth-overlay">
+            <div id="login-container">
+                <div id="phone-section">
+                    <h2 style="font-weight: 800; margin-bottom: 8px;">Welcome
+                    </h2>
+                    <p style="margin-bottom: 30px;">Enter your phone to continue</p>
+                    <div style="position: relative; margin-bottom: 25px;">
+                        <span
+                            style="position: absolute; left: 18px; top: 18px; font-weight: 700; z-index: 10;">+91</span>
+                        <input type="tel" id="phone-input" placeholder="000 000 0000" maxlength="10">
+                    </div>
+                    <button class="btn-primary" style="width: 100%;" onclick="sendOTP()">SEND OTP</button>
+                    <div id="recaptcha-container" style="margin-top: 20px;"></div>
+                </div>
+
+                <div id="otp-section" style="display: none;">
+                    <h2 style="font-weight: 800; margin-bottom: 8px;">Verify
+                        Phone</h2>
+                    <p style="margin-bottom: 30px;">Code sent to <span id="display-phone"
+                            style="color: var(--primary); font-weight: 800;"></span></p>
+                    <div class="otp-inputs">
+                        <input type="tel" class="otp-input" maxlength="1" autofocus>
+                        <input type="tel" class="otp-input" maxlength="1">
+                        <input type="tel" class="otp-input" maxlength="1">
+                        <input type="tel" class="otp-input" maxlength="1">
+                    </div>
+                    <button class="btn-primary" style="width: 100%;" onclick="verifyOTP()">VERIFY & LOGIN</button>
+                    <p style="text-align: center; margin-top: 20px; font-size: 0.9rem;">
+                        Didn't receive? <span style="color: var(--primary); font-weight: 600; cursor: pointer;"
+                            onclick="resendOTP()">Resend</span><span id="timer"></span>
+                    </p>
+                </div>
+
+                <div id="set-pin-section" style="display: none;">
+                    <h2 style="font-weight: 800; margin-bottom: 8px;">Set
+                        Login PIN</h2>
+                    <p style="margin-bottom: 30px;">Create a 4-digit PIN for security</p>
+                    <div class="pin-inputs">
+                        <input type="tel" class="pin-input set-pin" maxlength="1">
+                        <input type="tel" class="pin-input set-pin" maxlength="1">
+                        <input type="tel" class="pin-input set-pin" maxlength="1">
+                        <input type="tel" class="pin-input set-pin" maxlength="1">
+                    </div>
+                    <button class="btn-primary" style="width: 100%;" onclick="savePIN()">CONFIRM PIN</button>
+                </div>
+
+                <div id="login-pin-section" style="display: none;">
+                    <h2 style="font-weight: 800; margin-bottom: 8px;">Enter
+                        PIN</h2>
+                    <p style="margin-bottom: 30px;">Welcome back! Enter your PIN</p>
+                    <div class="pin-inputs">
+                        <input type="tel" class="pin-input login-pin" maxlength="1">
+                        <input type="tel" class="pin-input login-pin" maxlength="1">
+                        <input type="tel" class="pin-input login-pin" maxlength="1">
+                        <input type="tel" class="pin-input login-pin" maxlength="1">
+                    </div>
+                    <button class="btn-primary" style="width: 100%;" onclick="verifyPIN()">LOGIN</button>
+                    <p style="text-align: center; margin-top: 20px; font-size: 0.9rem;">
+                        Forgot PIN? <span style="color: var(--primary); font-weight: 800; cursor: pointer;"
+                            onclick="switchOTP()">Use OTP</span>
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Home View -->
+        <div id="home-view">
+            <header>
+                <div class="header-left">
+                    <h1 id="greeting" style="font-size: 1.2rem; font-weight: 800;">Namaste! 🙏</h1>
+                    <p style="font-size: 0.8rem; color: var(--text-muted);">Choose a template to start</p>
+                </div>
+                <div class="header-right" onclick="showProfile()">
+                    <div class="avatar-sm">
+                        <i data-lucide="user"></i>
+                    </div>
+                </div>
+            </header>
+
+            <div class="category-slider">
+                <div class="category-item active" onclick="filterTemplates('All', this)">
+                    <div class="cat-icon"><i data-lucide="layout-grid"></i></div>
+                    <span>All</span>
+                </div>
+                <div class="category-item" onclick="filterTemplates('Good Morning', this)">
+                    <div class="cat-icon"><i data-lucide="sun"></i></div>
+                    <span>Morning</span>
+                </div>
+                <div class="category-item" onclick="filterTemplates('Motivation', this)">
+                    <div class="cat-icon"><i data-lucide="zap"></i></div>
+                    <span>Quotes</span>
+                </div>
+                <div class="category-item" onclick="filterTemplates('Festival', this)">
+                    <div class="cat-icon"><i data-lucide="calendar"></i></div>
+                    <span>Festival</span>
+                </div>
+                <div class="category-item" onclick="filterTemplates('Devotional', this)">
+                    <div class="cat-icon"><i data-lucide="heart"></i></div>
+                    <span>Devotion</span>
+                </div>
+                <div class="category-item" onclick="filterTemplates('Love', this)">
+                    <div class="cat-icon"><i data-lucide="smile"></i></div>
+                    <span>Love</span>
+                </div>
+                <div class="category-item" onclick="filterTemplates('Video', this)">
+                    <div class="cat-icon"><i data-lucide="video"></i></div>
+                    <span>Video</span>
+                </div>
+            </div>
+
+            <div class="premium-promo">
+                <div class="promo-content">
+                    <h3>Crafto Premium</h3>
+                    <p>Unlock all templates</p>
+                </div>
+                <button class="promo-btn">Upgrade</button>
+            </div>
+
+            <div id="template-grid" class="content-grid">
+                <!-- Templates loaded via JS -->
+            </div>
+
+            <nav class="bottom-nav">
+                <div class="nav-item active"><i data-lucide="home"></i><span>Home</span></div>
+                <div class="nav-item"><i data-lucide="search"></i><span>Explore</span></div>
+                <div class="nav-fab"><i data-lucide="plus"></i></div>
+                <div class="nav-item"><i data-lucide="bell"></i><span>Alerts</span></div>
+                <div class="nav-item" onclick="showProfile()"><i data-lucide="settings"></i><span>Profile</span></div>
+            </nav>
+        </div>
+
+        <!-- Profile View -->
+        <div id="profile-view" class="view-container">
+            <header>
+                <button class="btn-ghost" onclick="showHome()"><i data-lucide="arrow-left"></i></button>
+                <h3>My Account</h3>
+                <div style="width: 40px;"></div>
+            </header>
+
+            <div class="profile-content">
+                <div class="profile-avatar" onclick="triggerProfileUpload()" style="cursor: pointer; overflow: hidden;">
+                    <img id="profile-img-preview" style="width: 100%; height: 100%; object-fit: cover; display: none;">
+                    <i id="profile-icon-placeholder" data-lucide="user"></i>
+                </div>
+                <!-- Hidden inputs -->
+                <input type="file" id="profile-pic-upload" style="display: none;" accept="image/*"
+                    onchange="handleProfilePicture(this)">
+                <h2 id="profile-phone-display">+91 0000000000</h2>
+                <p class="profile-subtitle">Active since Jan 2026</p>
+
+                <div class="profile-options">
+                    <div class="option-card">
+                        <div class="option-info">
+                            <i data-lucide="crown" style="color: var(--secondary);"></i>
+                            <span>Subscription Plan</span>
+                        </div>
+                        <span class="badge-secondary">FREE</span>
+                    </div>
+                    <div class="option-card clickable" onclick="showGallery()">
+                        <div class="option-info">
+                            <i data-lucide="download"></i>
+                            <span>Saved Designs</span>
+                        </div>
+                        <i data-lucide="chevron-right"></i>
+                    </div>
+                    <div class="option-card clickable">
+                        <div class="option-info">
+                            <i data-lucide="share-2"></i>
+                            <span>Refer & Earn</span>
+                        </div>
+                        <i data-lucide="chevron-right"></i>
+                    </div>
+                    <div class="option-card logout-card" onclick="handleLogout()">
+                        <div class="option-info">
+                            <i data-lucide="log-out"></i>
+                            <span>Logout</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Editor View -->
+        <div id="editor-view">
+            <div class="editor-header">
+                <button class="btn-ghost" onclick="closeEditor()"><i data-lucide="x"></i></button>
+                <h3>Edit Status</h3>
+                <button class="btn-primary" onclick="downloadImage()">Save</button>
+            </div>
+
+            <div class="canvas-container">
+                <canvas id="main-canvas"></canvas>
+            </div>
+
+            <div class="editor-tools">
+                <div class="editor-scroll-content">
+                    <div class="tool-group">
+                        <div class="tool-btn" onclick="triggerPhotoUpload()">
+                            <i data-lucide="image"></i>
+                            <div>Photo</div>
+                        </div>
+                        <div class="tool-btn" onclick="togglePanel('profile-panel')">
+                            <i data-lucide="user-plus"></i>
+                            <div>Move Img</div>
+                        </div>
+                        <div class="tool-btn" onclick="togglePanel('text-panel')">
+                            <i data-lucide="edit-3"></i>
+                            <div>Text</div>
+                        </div>
+                        <div class="tool-btn" onclick="togglePanel('font-panel')">
+                            <i data-lucide="type"></i>
+                            <div>Font</div>
+                        </div>
+                        <div class="tool-btn" onclick="togglePanel('color-panel')">
+                            <i data-lucide="palette"></i>
+                            <div>Color</div>
+                        </div>
+                        <div class="tool-btn" onclick="togglePanel('size-panel')">
+                            <i data-lucide="maximize"></i>
+                            <div>Size</div>
+                        </div>
+                        <div class="tool-btn" onclick="togglePanel('position-panel')">
+                            <i data-lucide="move"></i>
+                            <div>Move</div>
+                        </div>
+                    </div>
+
+                    <!-- Control Panels -->
+                    <div id="font-panel" class="editor-panel" style="display: none;">
+                        <button class="font-option" style="font-family: 'Outfit';"
+                            onclick="setFont('Outfit')">Outfit</button>
+                        <button class="font-option" style="font-family: 'serif';"
+                            onclick="setFont('serif')">Classic</button>
+                        <button class="font-option" style="font-family: 'cursive';"
+                            onclick="setFont('cursive')">Stylish</button>
+                        <button class="font-option" style="font-family: 'monospace';"
+                            onclick="setFont('monospace')">Bold</button>
+                    </div>
+
+                    <div id="color-panel" class="editor-panel" style="display: none;">
+                        <div class="color-dot" style="background: #ffffff;" onclick="setColor('#ffffff')"></div>
+                        <div class="color-dot" style="background: #f59e0b;" onclick="setColor('#f59e0b')"></div>
+                        <div class="color-dot" style="background: #ec4899;" onclick="setColor('#ec4899')"></div>
+                        <div class="color-dot" style="background: #6366f1;" onclick="setColor('#6366f1')"></div>
+                        <div class="color-dot" style="background: #25D366;" onclick="setColor('#25D366')"></div>
+                        <div class="color-dot" style="background: #000000; border: 1px solid #fff;"
+                            onclick="setColor('#000000')"></div>
+                    </div>
+
+                    <div id="size-panel" class="editor-panel" style="display: none; padding: 10px;">
+                        <input type="range" min="20" max="150" value="50" style="width: 100%;"
+                            oninput="setSize(this.value)">
+                    </div>
+
+                    <div id="position-panel" class="editor-panel"
+                        style="display: none; flex-direction: column; gap: 15px;">
+                        <div style="width: 100%;">
+                            <label style="font-size: 0.7rem; color: var(--text-muted);">Vertical Position</label>
+                            <input type="range" min="0" max="1080" value="930" style="width: 100%;"
+                                oninput="setPositionY(this.value)">
+                        </div>
+                        <div style="width: 100%;">
+                            <label style="font-size: 0.7rem; color: var(--text-muted);">Horizontal Position</label>
+                            <input type="range" min="0" max="1080" value="540" style="width: 100%;"
+                                oninput="setPositionX(this.value)">
+                        </div>
+                    </div>
+
+                    <div id="profile-panel" class="editor-panel"
+                        style="display: none; flex-direction: column; gap: 15px; padding: 15px;">
+                        <div style="width: 100%;">
+                            <label
+                                style="display: block; font-size: 0.75rem; color: var(--text-muted); margin-bottom: 5px;">Image
+                                Vertical Position</label>
+                            <input type="range" min="0" max="1080" value="540" style="width: 100%; height: 6px;"
+                                oninput="setProfileY(this.value)">
+                        </div>
+                        <div style="width: 100%;">
+                            <label
+                                style="display: block; font-size: 0.75rem; color: var(--text-muted); margin-bottom: 5px;">Image
+                                Horizontal Position</label>
+                            <input type="range" min="0" max="1080" value="540" style="width: 100%; height: 6px;"
+                                oninput="setProfileX(this.value)">
+                        </div>
+                        <div style="width: 100%;">
+                            <label
+                                style="display: block; font-size: 0.75rem; color: var(--text-muted); margin-bottom: 5px;">Image
+                                Scaling Size</label>
+                            <input type="range" min="20" max="800" value="150" style="width: 100%; height: 6px;"
+                                oninput="setProfileSize(this.value)">
+                        </div>
+                        <button class="btn-ghost" style="width: 100%;" onclick="toggleProfileVisibility()">Show/Hide
+                            Image</button>
+                    </div>
+
+                    <!-- Inline Text Editor (Integrated Panel) -->
+                    <div id="text-panel" class="editor-panel"
+                        style="display: none; flex-direction: column; background: rgba(255, 255, 255, 0.5); padding: 12px; border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.3); backdrop-filter: blur(10px);">
+                        <textarea id="text-input-field" rows="2" placeholder="Tap to edit text..."
+                            style="width: 100%; background: transparent; border: none; color: #1e293b; padding: 0; font-size: 0.95rem; resize: none; outline: none;"
+                            oninput="updateTextFromInput(this.value)"></textarea>
+                        <div class="text-presets"
+                            style="margin-top: 8px; display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px;">
+                            <button class="preset-btn" onclick="applyPreset('Beautiful Day!')"
+                                style="padding: 4px 8px; font-size: 0.65rem;">Theme 1</button>
+                            <button class="preset-btn" onclick="applyPreset('Good Morning!')"
+                                style="padding: 4px 8px; font-size: 0.65rem;">Theme 2</button>
+                            <button class="preset-btn" onclick="applyPreset('Always Smile.')"
+                                style="padding: 4px 8px; font-size: 0.65rem;">Theme 3</button>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- Pinned Footer Section -->
+                <div class="editor-footer">
+                    <div style="display: flex; gap: 10px;">
+                        <button class="btn-primary"
+                            style="flex: 1; background: rgba(52, 211, 153, 0.9); display: flex; align-items: center; justify-content: center; height: 50px; font-size: 1rem; border-radius: 14px; box-shadow: 0 10px 20px rgba(52, 211, 153, 0.2); border: 1px solid rgba(255,255,255,0.4); backdrop-filter: blur(10px);"
+                            onclick="shareWhatsApp()">
+                            <i data-lucide="whatsapp"
+                                style="margin-right:8px; width: 22px; height: 22px; color: #fff;"></i>
+                            <span style="font-weight: 700; letter-spacing: 0.5px; color: #fff;">SEND ON WHATSAPP</span>
+                        </button>
+                        <button class="btn-ghost"
+                            style="width: 50px; height: 50px; display: flex; align-items: center; justify-content: center; border-radius: 14px; background: rgba(255, 255, 255, 0.5); border: 1px solid rgba(255, 255, 255, 0.4); backdrop-filter: blur(10px);"
+                            onclick="downloadImage()">
+                            <i data-lucide="arrow-down-to-line" style="width: 20px; height: 20px; color: #3B82F6;"></i>
+                        </button>
+                    </div>
+                </div>
+            </div> <!-- End editor-tools -->
+
+        </div> <!-- End editor-view -->
+
+        <!-- Processing Overlay for Video Export -->
+        <div id="processing-overlay"
+            style="display: none; position: absolute; inset: 0; background: rgba(255, 255, 255, 0.4); z-index: 1000; flex-direction: column; align-items: center; justify-content: center; backdrop-filter: blur(25px);">
+            <div class="loader"
+                style="width: 50px; height: 50px; border: 4px solid rgba(255,255,255,0.3); border-top: 4px solid #60A5FA; border-radius: 50%; animation: spin 1s linear infinite;">
+            </div>
+            <h3 style="margin-top: 20px; font-weight: 700; color: #1e293b;">Processing Video...</h3>
+            <p id="processing-status" style="margin-top: 8px; color: #64748b; font-size: 0.85rem;">Please
+                wait,
+                capturing frames</p>
+
+            <style>
+                @keyframes spin {
+                    0% {
+                        transform: rotate(0deg);
+                    }
+
+                    100% {
+                        transform: rotate(360deg);
+                    }
+                }
+            </style>
+        </div>
+
+        <!-- Hidden Global Elements -->
+        <input type="file" id="photo-upload" style="display: none;" accept="image/*">
+
+
+        <!-- Gallery View -->
+        <div id="gallery-view" class="view-container">
+            <header>
+                <button class="btn-ghost" onclick="hideGallery()"><i data-lucide="arrow-left"></i></button>
+                <h3>My Gallery</h3>
+                <button class="btn-ghost" onclick="clearGallery()"><i data-lucide="trash-2"></i></button>
+            </header>
+            <div id="gallery-grid" class="content-grid" style="padding-top: 20px;">
+                <!-- Saved designs will appear here -->
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+    <script>
+        if (typeof lucide !== 'undefined') {
+            lucide.createIcons();
+        }
+    </script>
+</body>
+
+</html>
