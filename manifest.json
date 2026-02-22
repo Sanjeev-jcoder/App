@@ -1,21 +1,21 @@
 {
-  "name": "Crafto Status Maker",
+  "name": "Crafto - Status & Video Maker",
   "short_name": "Crafto",
-  "description": "Create beautiful video and image status updates.",
+  "description": "Create high-end, cinematic status updates with a modern glassmorphic touch. Perfect for WhatsApp, Instagram, and Facebook.",
   "start_url": "/index.html",
   "display": "standalone",
-  "background_color": "#0f172a",
-  "theme_color": "#6366f1",
+  "background_color": "#f0f4f8",
+  "theme_color": "#60A5FA",
   "orientation": "portrait",
   "icons": [
     {
-      "src": "https://via.placeholder.com/192/6366f1/ffffff?text=C",
+      "src": "https://via.placeholder.com/192/60A5FA/ffffff?text=G",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "https://via.placeholder.com/512/6366f1/ffffff?text=Crafto",
+      "src": "https://via.placeholder.com/512/60A5FA/ffffff?text=Crafto",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"

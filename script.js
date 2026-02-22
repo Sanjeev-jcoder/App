@@ -79,23 +79,26 @@ let lastTapX = 0;
 let lastTapY = 0;
 
 // --- FIREBASE CONFIGURATION ---
-// Replace the values below with your real Firebase Config from the Firebase Console
 const firebaseConfig = {
-    apiKey: "YOUR_API_KEY",
-    authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-    projectId: "YOUR_PROJECT_ID",
-    storageBucket: "YOUR_PROJECT_ID.appspot.com",
-    messagingSenderId: "YOUR_SENDER_ID",
-    appId: "YOUR_APP_ID"
+    apiKey: "AIzaSyDqfN_aN5xA7b1HDNIIbRLIXhFmO2M7Qmk",
+    authDomain: "whatsapp-status-8eddd.firebaseapp.com",
+    projectId: "whatsapp-status-8eddd",
+    storageBucket: "whatsapp-status-8eddd.firebasestorage.app",
+    messagingSenderId: "903368195803",
+    appId: "1:903368195803:web:1e03652603ec6905bc56fe",
+    measurementId: "G-LZ9503W5S1"
 };
 
-// Initialize Firebase (if config is provided)
-if (firebaseConfig.apiKey !== "YOUR_API_KEY") {
-    firebase.initializeApp(firebaseConfig);
-}
+// Initialize Firebase SDKs (using compat for existing logic)
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+const auth = firebase.auth();
+const storage = firebase.storage();
 
 let verificationId = null;
 let isLogged = false;
+let isSubscribed = false; // Real-time subscription status
+let subConfig = { price: 0, upiId: '', planName: 'Crafto Pro' }; // Loaded from admin config
 
 const greetings = [
     "Namaste! 🙏",
@@ -135,7 +138,12 @@ window.onload = () => {
 
         if (typeof lucide !== 'undefined') lucide.createIcons();
 
-        renderTemplates();
+        // Load Templates from Firestore
+        loadCloudTemplates();
+
+        // Subscription System Init
+        loadSubscriptionConfig();
+        checkSubscriptionStatus();
 
         // Set random greeting
         const greetingText = greetings[Math.floor(Math.random() * greetings.length)];
@@ -168,12 +176,18 @@ window.onload = () => {
             const savedPic = localStorage.getItem('user_profile_pic');
             if (savedPic) {
                 const img = new Image();
+                if (savedPic.startsWith('http')) img.crossOrigin = "anonymous";
                 img.src = savedPic;
                 img.onload = () => {
                     userProfilePic = img;
                     document.getElementById('profile-img-preview').src = savedPic;
                     document.getElementById('profile-img-preview').style.display = 'block';
                     document.getElementById('profile-icon-placeholder').style.display = 'none';
+                    // Sync to header avatar
+                    const headerImg = document.getElementById('header-profile-img');
+                    const headerIcon = document.getElementById('header-profile-icon');
+                    if (headerImg) { headerImg.src = savedPic; headerImg.style.display = 'block'; }
+                    if (headerIcon) headerIcon.style.display = 'none';
                 };
             }
         } else if (localStorage.getItem('user_pin')) {
@@ -326,14 +340,86 @@ function loginSuccess() {
     }, 500);
 }
 
-function showProfile() {
-    document.getElementById('home-view').style.display = 'none';
-    document.getElementById('profile-view').style.display = 'flex';
+function switchView(viewId, el) {
+    const views = ['home-view', 'explore-view', 'alerts-view', 'profile-view', 'gallery-view'];
+    views.forEach(id => {
+        const view = document.getElementById(id);
+        if (view) view.style.display = 'none';
+    });
+
+    const target = document.getElementById(viewId);
+    if (target) {
+        target.style.display = (viewId === 'home-view' || viewId === 'editor-view') ? 'block' : 'flex';
+    }
+
+    // Sync bottom nav
+    document.querySelectorAll('.nav-item').forEach(item => {
+        item.classList.remove('active');
+        const span = item.querySelector('span');
+        if (span) {
+            const text = span.innerText.toLowerCase();
+            if (viewId.includes(text)) item.classList.add('active');
+            // Special case for Home
+            if (viewId === 'home-view' && text === 'home') item.classList.add('active');
+        }
+    });
+
+    if (el) {
+        el.classList.add('active');
+    }
 }
 
-function showHome() {
-    document.getElementById('home-view').style.display = 'block';
-    document.getElementById('profile-view').style.display = 'none';
+function showProfile() { switchView('profile-view'); }
+function showHome() { switchView('home-view'); }
+
+function searchTemplates(query) {
+    const q = query.toLowerCase().trim();
+    const defaultContent = document.getElementById('explore-default-content');
+    const resultsContainer = document.getElementById('explore-results');
+
+    if (!q) {
+        if (defaultContent) defaultContent.style.display = 'block';
+        if (resultsContainer) resultsContainer.style.display = 'none';
+        return;
+    }
+
+    if (defaultContent) defaultContent.style.display = 'none';
+    if (resultsContainer) resultsContainer.style.display = 'block';
+
+    const filtered = templates.filter(t =>
+        (t.name && t.name.toLowerCase().includes(q)) ||
+        (t.category && t.category.toLowerCase().includes(q))
+    );
+
+    renderFilteredTemplates(filtered);
+}
+
+function renderFilteredTemplates(filtered) {
+    const grid = document.getElementById('explore-results-grid');
+    if (!grid) return;
+    grid.innerHTML = '';
+
+    if (filtered.length === 0) {
+        grid.innerHTML = `<div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: var(--text-muted);">No matching templates found</div>`;
+        return;
+    }
+
+    filtered.forEach(t => {
+        const div = document.createElement('div');
+        div.className = 'template-card';
+        div.style.backgroundColor = '#0a0a0a';
+        let mediaHtml = (t.type === 'video')
+            ? `<video src="${t.src}" muted loop playsinline autoplay style="width:100%; height:100%; object-fit:cover;"></video>`
+            : `<img src="${t.src}" alt="${t.name}">`;
+
+        div.innerHTML = `
+            ${mediaHtml}
+            ${t.premium ? '<div class="premium-tag">PREMIUM</div>' : ''}
+            <div class="template-info">${t.name}</div>
+        `;
+        div.onclick = () => openEditor(t);
+        grid.appendChild(div);
+    });
 }
 
 function handleLogout() {
@@ -434,6 +520,36 @@ function renderTemplates(filter = 'All') {
     });
 }
 
+const BLANK_GRADIENTS = [
+    ['#667eea', '#764ba2'],
+    ['#f093fb', '#f5576c'],
+    ['#4facfe', '#00f2fe'],
+    ['#43e97b', '#38f9d7'],
+    ['#fa709a', '#fee140'],
+    ['#a18cd1', '#fbc2eb'],
+    ['#ffecd2', '#fcb69f'],
+    ['#0c3483', '#a2b6df'],
+    ['#1e3c72', '#2a5298'],
+    ['#ff9a9e', '#fecfef'],
+];
+
+function createBlankStatus() {
+    const gradient = BLANK_GRADIENTS[Math.floor(Math.random() * BLANK_GRADIENTS.length)];
+
+    const blankTemplate = {
+        id: 'blank_' + Date.now(),
+        name: 'Blank Canvas',
+        category: 'Custom',
+        type: 'blank',
+        gradient: gradient,
+        src: '',
+        premium: false,
+        frame: { x: 0.5, y: 0.5, r: 0.2, type: 'circle' }
+    };
+
+    openEditor(blankTemplate);
+}
+
 function openEditor(template) {
     selectedTemplate = template;
     resetPhotoPosition();
@@ -513,6 +629,17 @@ function drawCanvas() {
 
     if (selectedTemplate.type === 'video') return; // Handled by renderLoop
 
+    // Handle blank canvas with gradient
+    if (selectedTemplate.type === 'blank' && selectedTemplate.gradient) {
+        const grad = ctx.createLinearGradient(0, 0, 1080, 1080);
+        grad.addColorStop(0, selectedTemplate.gradient[0]);
+        grad.addColorStop(1, selectedTemplate.gradient[1]);
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, 1080, 1080);
+        drawOverlays();
+        return;
+    }
+
     const render = (bImg) => {
         // No clearRect needed when drawing full-screen background
         ctx.drawImage(bImg, 0, 0, 1080, 1080);
@@ -524,10 +651,21 @@ function drawCanvas() {
     } else {
         const img = new Image();
         img.crossOrigin = "anonymous";
-        img.src = selectedTemplate.src;
+        // Add cache-buster for external URLs to fix CORS issues in some browsers
+        const src = selectedTemplate.src.startsWith('http')
+            ? selectedTemplate.src + (selectedTemplate.src.includes('?') ? '&' : '?') + 't=' + Date.now()
+            : selectedTemplate.src;
+        img.src = src;
         img.onload = () => {
             imgCache[selectedTemplate.src] = img;
             render(img);
+        };
+        img.onerror = () => {
+            console.error("Failed to load template image:", selectedTemplate.src);
+            // Fallback for local assets if cache-buster fails
+            if (src !== selectedTemplate.src) {
+                img.src = selectedTemplate.src;
+            }
         };
     }
 }
@@ -728,6 +866,11 @@ function handleProfilePicture(input) {
                 document.getElementById('profile-img-preview').src = dataUrl;
                 document.getElementById('profile-img-preview').style.display = 'block';
                 document.getElementById('profile-icon-placeholder').style.display = 'none';
+                // Sync to header avatar
+                const headerImg = document.getElementById('header-profile-img');
+                const headerIcon = document.getElementById('header-profile-icon');
+                if (headerImg) { headerImg.src = dataUrl; headerImg.style.display = 'block'; }
+                if (headerIcon) headerIcon.style.display = 'none';
             };
         };
         reader.readAsDataURL(file);
@@ -925,95 +1068,337 @@ function resetPhotoPosition() {
 // }
 
 function downloadImage() {
-    if (selectedTemplate && selectedTemplate.type === 'video') {
-        recordVideo('download');
+    if (subConfig.price > 0 && !isSubscribed) {
+        togglePaymentModal(true);
+        return;
+    }
+
+    // Safety check: Only trigger video recording if template is explicitly 'video' 
+    // AND has a valid video source extension.
+    const isVideo = selectedTemplate &&
+        selectedTemplate.type === 'video' &&
+        (selectedTemplate.src.toLowerCase().endsWith('.mp4') ||
+            selectedTemplate.src.toLowerCase().endsWith('.webm'));
+
+    if (isVideo) {
+        recordVideo('download').catch(err => {
+            console.error("Video recording failed, falling back to image:", err);
+            saveCanvasAsImage();
+        });
     } else {
+        saveCanvasAsImage();
+    }
+}
+
+function saveCanvasAsImage() {
+    try {
+        // Use a slightly lower quality if 1.0 fails or produces giant files
         const dataUrl = canvas.toDataURL('image/png');
         saveToGallery(dataUrl);
 
         const link = document.createElement('a');
-        link.download = 'crafto-status.png';
+        link.download = `crafto-status-${Date.now()}.png`;
         link.href = dataUrl;
+        document.body.appendChild(link);
         link.click();
+        document.body.removeChild(link);
+    } catch (e) {
+        console.error("Image download failed:", e);
+        if (e.name === 'SecurityError') {
+            alert("🔒 Security Error: This template uses an image from a different website that blocks downloads. \n\nTry:\n1. Use a different template\n2. Log in again\n3. Take a screenshot");
+        } else {
+            alert("❌ Download Failed: " + (e.message || "Unknown error"));
+        }
+    }
+}
+
+function toggleShareSheet() {
+    const sheet = document.getElementById('share-sheet');
+    if (!sheet) return;
+    if (sheet.style.display === 'none' || !sheet.style.display) {
+        sheet.style.display = 'block';
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+    } else {
+        sheet.style.display = 'none';
+    }
+}
+
+async function getCanvasBlob() {
+    return new Promise(resolve => {
+        canvas.toBlob(blob => resolve(blob), 'image/png');
+    });
+}
+
+async function shareImageToApp(appName) {
+    if (subConfig.price > 0 && !isSubscribed) {
+        togglePaymentModal(true);
+        return;
+    }
+
+    const btn = event.currentTarget;
+    const originalContent = btn.innerHTML;
+
+    try {
+        // 1. Show processing state
+        btn.innerHTML = `<div class="loader" style="width:20px; height:20px; border-width:2px; border-top-color:#fff;"></div>`;
+        btn.style.pointerEvents = 'none';
+
+        // 2. Generate Image
+        const dataUrl = canvas.toDataURL('image/png', 0.9);
+        saveToGallery(dataUrl);
+
+        // 3. Detect Mobile vs Desktop
+        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+
+        if (isMobile && navigator.share) {
+            // Convert DataURL to Blob for sharing
+            const response = await fetch(dataUrl);
+            const blob = await response.blob();
+            const file = new File([blob], 'status.png', { type: 'image/png' });
+
+            if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                await navigator.share({
+                    files: [file],
+                    title: 'Crafto Status',
+                    text: 'Created with Crafto Status Maker'
+                });
+                toggleShareSheet();
+            } else {
+                throw new Error("Can't share files");
+            }
+        } else {
+            // Desktop Fallback: Download + Alert
+            const link = document.createElement('a');
+            link.download = `crafto-${Date.now()}.png`;
+            link.href = dataUrl;
+            link.click();
+
+            toggleShareSheet();
+            alert(`✅ Image Downloaded!\n\nPlease open ${appName} and select the downloaded image from your gallery.`);
+        }
+    } catch (e) {
+        console.error("Share failed:", e);
+        // Universal fallback
+        const link = document.createElement('a');
+        link.href = canvas.toDataURL('image/png');
+        link.download = 'status.png';
+        link.click();
+        alert("Image saved to gallery! Please share it manually.");
+    } finally {
+        btn.innerHTML = originalContent;
+        btn.style.pointerEvents = 'auto';
+    }
+}
+
+function shareToWhatsApp() { shareImageToApp('WhatsApp'); }
+function shareToInstagram() { shareImageToApp('Instagram'); }
+function shareToFacebook() { shareImageToApp('Facebook'); }
+function shareToTelegram() { shareImageToApp('Telegram'); }
+function shareGeneric() { shareImageToApp('your favorite app'); }
+
+// --- SUBSCRIPTION LOGIC ---
+async function loadSubscriptionConfig() {
+    db.collection('config').doc('subscription').onSnapshot(doc => {
+        if (doc.exists) {
+            subConfig = doc.data();
+            updatePaymentUI();
+        }
+    });
+}
+
+function checkSubscriptionStatus() {
+    const phone = localStorage.getItem('user_phone');
+    if (!phone) return;
+
+    db.collection('subscriptions').where('phone', '==', phone).where('status', '==', 'active').onSnapshot(snap => {
+        isSubscribed = !snap.empty;
+        const subBadge = document.getElementById('profile-sub-badge');
+        const freeBadge = document.getElementById('profile-free-badge');
+
+        if (subBadge) subBadge.style.display = isSubscribed ? 'inline-block' : 'none';
+        if (freeBadge) freeBadge.style.display = isSubscribed ? 'none' : 'inline-block';
+
+        // If price is 0, everyone is "subscribed"
+        if (subConfig.price === 0) {
+            isSubscribed = true;
+            if (subBadge) subBadge.style.display = 'inline-block';
+            if (freeBadge) freeBadge.style.display = 'none';
+        }
+    });
+}
+
+function updatePaymentUI() {
+    const price = subConfig.price || 0;
+    const upiId = subConfig.upiId || '';
+    const name = subConfig.planName || 'Crafto Pro';
+    const merchant = subConfig.merchantName || 'Crafto App';
+
+    const payAmount = document.getElementById('pay-amount');
+    const payPlan = document.getElementById('pay-plan-name');
+    if (payAmount) payAmount.innerText = `₹${price}`;
+    if (payPlan) payPlan.innerText = `Upgrade to ${name}`;
+
+    // UPI URL generation: upi://pay?pa=UPIID&pn=NAME&am=AMOUNT&cu=INR
+    const upiUrl = `upi://pay?pa=${upiId}&pn=${encodeURIComponent(merchant)}&am=${price}&cu=INR`;
+
+    const gpay = document.getElementById('gpay-link');
+    const phonepe = document.getElementById('phonepe-link');
+    const paytm = document.getElementById('paytm-link');
+
+    if (gpay) gpay.href = upiUrl;
+    if (phonepe) phonepe.href = upiUrl;
+    if (paytm) paytm.href = upiUrl;
+
+    // If price is 0, auto-subscribe everyone (visual only)
+    if (price === 0) isSubscribed = true;
+}
+
+function togglePaymentModal(show) {
+    const modal = document.getElementById('payment-modal');
+    if (modal) modal.style.display = show ? 'flex' : 'none';
+    if (show) updatePaymentUI();
+}
+
+async function submitPayment() {
+    const txnIdInput = document.getElementById('txn-id-input');
+    const submitBtn = document.querySelector('button[onclick="submitPayment()"]');
+    const txnId = txnIdInput.value.trim();
+    const phone = localStorage.getItem('user_phone');
+
+    if (!phone) {
+        alert('❌ SESSION EXPIRED: Please Login again to continue with the upgrade.');
+        switchView('profile-view');
+        togglePaymentModal(false);
+        return;
+    }
+
+    if (!txnId || txnId.length < 6) {
+        alert('❌ INVALID ID: Please enter a valid Transaction ID / UTR (usually 12 digits) from your payment app.');
+        return;
+    }
+
+    try {
+        const originalText = submitBtn.innerText;
+        submitBtn.innerText = "⏳ Verifying...";
+        submitBtn.disabled = true;
+
+        await db.collection('subscriptions').add({
+            phone: phone,
+            transactionId: txnId,
+            amount: subConfig.price,
+            planName: subConfig.planName,
+            status: 'pending',
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+
+        alert('✅ PAYMENT SUBMITTED!\n\nYour details have been sent to the admin for manual verification. Your account will be activated within 2-4 hours.\n\nYou will see the "PRO" badge in your profile once approved.');
+        togglePaymentModal(false);
+        txnIdInput.value = '';
+    } catch (e) {
+        console.error("Subscription submission failed:", e);
+        alert('❌ SYSTEM ERROR: Could not submit payment details. Error: ' + e.message);
+    } finally {
+        submitBtn.innerText = "Verify Payment";
+        submitBtn.disabled = false;
     }
 }
 
 async function recordVideo(mode = 'download') {
-    if (!canvas || !videoEl) return;
+    if (!canvas || !videoEl) {
+        throw new Error("No video element found");
+    }
 
     const overlay = document.getElementById('processing-overlay');
     const statusText = document.getElementById('processing-status');
-    overlay.style.display = 'flex';
-    statusText.innerText = "Initializing recorder...";
 
-    // Capture at 30fps
-    const stream = canvas.captureStream(30);
-    const recorder = new MediaRecorder(stream, {
-        mimeType: 'video/webm;codecs=vp9',
-        videoBitsPerSecond: 5000000
-    });
+    try {
+        overlay.style.display = 'flex';
+        statusText.innerText = "Initializing recorder...";
 
-    const chunks = [];
-    recorder.ondataavailable = e => chunks.push(e.data);
+        // 1. Initial Checks
+        if (videoEl.readyState < 2) {
+            statusText.innerText = "Waiting for video data...";
+            await new Promise((res, rej) => {
+                const timeout = setTimeout(() => rej(new Error("Video load timeout")), 5000);
+                videoEl.onloadeddata = () => { clearTimeout(timeout); res(); };
+            });
+        }
 
-    recorder.onstop = async () => {
-        const blob = new Blob(chunks, { type: 'video/webm' });
-        const url = URL.createObjectURL(blob);
-        const fileName = `crafto-video-${Date.now()}.webm`;
+        // 2. Setup Recorder
+        const stream = canvas.captureStream(30);
+        const recorder = new MediaRecorder(stream, {
+            mimeType: 'video/webm;codecs=vp9',
+            videoBitsPerSecond: 5000000
+        });
 
-        // Save thumbnail to gallery
-        const thumbUrl = canvas.toDataURL('image/jpeg', 0.7);
-        saveToGallery(thumbUrl);
+        const chunks = [];
+        recorder.ondataavailable = e => chunks.push(e.data);
 
-        if (mode === 'share') {
-            const file = new File([blob], fileName, { type: 'video/webm' });
-            if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+        return new Promise(async (resolve, reject) => {
+            const safetyTimeout = setTimeout(() => {
+                if (recorder.state === 'recording') recorder.stop();
+                reject(new Error("Recording timed out"));
+            }, 15000); // 15s absolute limit
+
+            recorder.onstop = async () => {
+                clearTimeout(safetyTimeout);
                 try {
-                    await navigator.share({
-                        files: [file],
-                        title: 'My Video Status',
-                        text: 'Created with Crafto'
-                    });
-                } catch (err) {
-                    console.error("Video share failed:", err);
+                    const blob = new Blob(chunks, { type: 'video/webm' });
+                    const url = URL.createObjectURL(blob);
+                    const fileName = `crafto-video-${Date.now()}.webm`;
+                    const thumbUrl = canvas.toDataURL('image/jpeg', 0.7);
+                    saveToGallery(thumbUrl);
+
+                    if (mode === 'share') {
+                        const file = new File([blob], fileName, { type: 'video/webm' });
+                        if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+                            await navigator.share({ files: [file], title: 'My Video', text: 'Created with Crafto' });
+                        } else {
+                            const a = document.createElement('a');
+                            a.href = url; a.download = fileName; a.click();
+                            alert("Sharing not supported, video downloaded instead!");
+                        }
+                    } else {
+                        const a = document.createElement('a');
+                        a.href = url; a.download = fileName; a.click();
+                        alert("✅ Video successfully saved to your downloads!");
+                    }
+                    resolve();
+                } catch (e) {
+                    reject(e);
+                } finally {
+                    overlay.style.display = 'none';
                 }
-            } else {
-                // Fallback to download if share not supported
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = fileName;
-                a.click();
-                alert("Sharing not supported, video downloaded instead!");
-            }
-        } else {
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = fileName;
-            a.click();
-            alert("✅ Video successfully saved to your downloads!");
-        }
+            };
 
+            recorder.onerror = e => reject(e);
+
+            // 3. Start Playback & Recording
+            videoEl.currentTime = 0;
+            await videoEl.play().catch(e => reject(new Error("Playback blocked: " + e.message)));
+            recorder.start();
+
+            let duration = videoEl.duration || 5;
+            if (duration > 15) duration = 15;
+
+            let elapsed = 0;
+            const interval = setInterval(() => {
+                elapsed += 0.5;
+                const progress = Math.round((elapsed / duration) * 100);
+                statusText.innerText = `Rendering: ${Math.min(progress, 100)}%`;
+
+                if (elapsed >= duration || recorder.state === 'inactive') {
+                    clearInterval(interval);
+                    if (recorder.state === 'recording') recorder.stop();
+                }
+            }, 500);
+        });
+
+    } catch (err) {
+        console.error("Recording error:", err);
         overlay.style.display = 'none';
-    };
-
-    videoEl.currentTime = 0;
-    await videoEl.play();
-    recorder.start();
-
-    let duration = videoEl.duration || 5;
-    if (duration > 15) duration = 15;
-
-    let elapsed = 0;
-    const interval = setInterval(() => {
-        elapsed += 0.5;
-        const progress = Math.round((elapsed / duration) * 100);
-        statusText.innerText = `Rendering: ${Math.min(progress, 100)}%`;
-
-        if (elapsed >= duration) {
-            clearInterval(interval);
-            recorder.stop();
-        }
-    }, 500);
+        throw err;
+    }
 }
 
 function saveToGallery(dataUrl) {
@@ -1134,5 +1519,31 @@ async function shareWhatsApp() {
 }
 
 function promptFallbackShare() {
+}
+
+// --- CLOUD TEMPLATE LOADING ---
+async function loadCloudTemplates() {
+    try {
+        // Fallback to defaults first while loading
+        templates = [...DEFAULT_TEMPLATES];
+        renderTemplates();
+
+        // Listen for real-time updates from Firestore
+        db.collection('templates').onSnapshot((snapshot) => {
+            const cloudTemplates = snapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data()
+            }));
+
+            if (cloudTemplates.length > 0) {
+                // Merge or replace based on preference
+                templates = [...cloudTemplates];
+                renderTemplates();
+                console.log("Cloud Templates Loaded:", cloudTemplates.length);
+            }
+        });
+    } catch (error) {
+        console.error("Cloud Loading Error:", error);
+    }
 }
 

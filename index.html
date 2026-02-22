@@ -19,6 +19,8 @@
     <!-- Firebase SDKs -->
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-storage-compat.js"></script>
 </head>
 
 <body>
@@ -107,8 +109,12 @@
                     <p style="font-size: 0.8rem; color: var(--text-muted);">Choose a template to start</p>
                 </div>
                 <div class="header-right" onclick="showProfile()">
-                    <div class="avatar-sm">
-                        <i data-lucide="user"></i>
+                    <div
+                        style="width: 36px; height: 36px; border-radius: 50%; overflow: hidden; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #60A5FA, #34D399); flex-shrink: 0;">
+                        <img id="header-profile-img"
+                            style="width: 100%; height: 100%; object-fit: cover; display: none; border-radius: 50%;">
+                        <i id="header-profile-icon" data-lucide="user"
+                            style="width: 20px; height: 20px; color: white;"></i>
                     </div>
                 </div>
             </header>
@@ -157,12 +163,87 @@
             </div>
 
             <nav class="bottom-nav">
-                <div class="nav-item active"><i data-lucide="home"></i><span>Home</span></div>
-                <div class="nav-item"><i data-lucide="search"></i><span>Explore</span></div>
-                <div class="nav-fab"><i data-lucide="plus"></i></div>
-                <div class="nav-item"><i data-lucide="bell"></i><span>Alerts</span></div>
-                <div class="nav-item" onclick="showProfile()"><i data-lucide="settings"></i><span>Profile</span></div>
+                <div class="nav-item active" onclick="switchView('home-view', this)"><i
+                        data-lucide="home"></i><span>Home</span></div>
+                <div class="nav-item" onclick="switchView('explore-view', this)"><i
+                        data-lucide="search"></i><span>Explore</span></div>
+                <div class="nav-fab" onclick="createBlankStatus()"><i data-lucide="plus"></i></div>
+                <div class="nav-item" onclick="switchView('alerts-view', this)"><i
+                        data-lucide="bell"></i><span>Alerts</span></div>
+                <div class="nav-item" onclick="switchView('profile-view', this)"><i
+                        data-lucide="settings"></i><span>Profile</span></div>
             </nav>
+        </div>
+
+        <!-- Explore View -->
+        <div id="explore-view" class="view-container">
+            <header>
+                <button class="btn-ghost" onclick="switchView('home-view')"><i data-lucide="arrow-left"></i></button>
+                <h3>Explore</h3>
+                <div style="width: 40px;"></div>
+            </header>
+            <div style="padding: 20px;">
+                <div
+                    style="background: rgba(255,255,255,0.6); padding: 12px 18px; border-radius: 16px; border: 1px solid rgba(255,255,255,0.5); display: flex; align-items: center; gap: 10px; margin-bottom: 25px;">
+                    <i data-lucide="search" style="width: 20px; color: var(--text-muted);"></i>
+                    <input type="text" id="explore-search-input" placeholder="Search templates..."
+                        style="background: transparent; border: none; outline: none; width: 100%; font-size: 1rem; color: var(--text-main);"
+                        oninput="searchTemplates(this.value)">
+                </div>
+
+                <div id="explore-default-content">
+                    <h4 style="margin-bottom: 15px; color: var(--text-main);">Popular Categories</h4>
+                    <div class="category-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                        <button class="btn-ghost"
+                            style="height: 100px; display: flex; flex-direction: column; gap: 8px;"
+                            onclick="switchView('home-view'); filterTemplates('Good Morning', document.querySelector('.category-item'))">
+                            <i data-lucide="sun" style="width: 28px; height: 28px;"></i>
+                            <span>Morning</span>
+                        </button>
+                        <button class="btn-ghost"
+                            style="height: 100px; display: flex; flex-direction: column; gap: 8px;"
+                            onclick="switchView('home-view'); filterTemplates('Motivation', document.querySelector('.category-item'))">
+                            <i data-lucide="zap" style="width: 28px; height: 28px;"></i>
+                            <span>Quotes</span>
+                        </button>
+                        <button class="btn-ghost"
+                            style="height: 100px; display: flex; flex-direction: column; gap: 8px;"
+                            onclick="switchView('home-view'); filterTemplates('Festival', document.querySelector('.category-item'))">
+                            <i data-lucide="calendar" style="width: 28px; height: 28px;"></i>
+                            <span>Festival</span>
+                        </button>
+                        <button class="btn-ghost"
+                            style="height: 100px; display: flex; flex-direction: column; gap: 8px;"
+                            onclick="switchView('home-view'); filterTemplates('Love', document.querySelector('.category-item'))">
+                            <i data-lucide="heart" style="width: 28px; height: 28px;"></i>
+                            <span>Love</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div id="explore-results" style="display: none;">
+                    <h4 id="search-results-title" style="margin-bottom: 15px; color: var(--text-main);">Search Results
+                    </h4>
+                    <div id="explore-results-grid" class="content-grid" style="padding-bottom: 100px;">
+                        <!-- Search results rendered here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Alerts View -->
+        <div id="alerts-view" class="view-container">
+            <header>
+                <button class="btn-ghost" onclick="switchView('home-view')"><i data-lucide="arrow-left"></i></button>
+                <h3>Notifications</h3>
+                <div style="width: 40px;"></div>
+            </header>
+            <div style="padding: 20px;">
+                <div style="text-align: center; padding: 60px 20px; color: var(--text-muted);">
+                    <i data-lucide="bell-off" style="width: 48px; height: 48px; margin-bottom: 15px; opacity: 0.3;"></i>
+                    <p>No new notifications at the moment.</p>
+                </div>
+            </div>
         </div>
 
         <!-- Profile View -->
@@ -190,7 +271,9 @@
                             <i data-lucide="crown" style="color: var(--secondary);"></i>
                             <span>Subscription Plan</span>
                         </div>
-                        <span class="badge-secondary">FREE</span>
+                        <span id="profile-sub-badge" class="badge-secondary"
+                            style="display: none; background: #34D399; color: #fff;">PRO</span>
+                        <span id="profile-free-badge" class="badge-secondary">FREE</span>
                     </div>
                     <div class="option-card clickable" onclick="showGallery()">
                         <div class="option-info">
@@ -352,11 +435,11 @@
                 <div class="editor-footer">
                     <div style="display: flex; gap: 10px;">
                         <button class="btn-primary"
-                            style="flex: 1; background: rgba(52, 211, 153, 0.9); display: flex; align-items: center; justify-content: center; height: 50px; font-size: 1rem; border-radius: 14px; box-shadow: 0 10px 20px rgba(52, 211, 153, 0.2); border: 1px solid rgba(255,255,255,0.4); backdrop-filter: blur(10px);"
-                            onclick="shareWhatsApp()">
-                            <i data-lucide="whatsapp"
-                                style="margin-right:8px; width: 22px; height: 22px; color: #fff;"></i>
-                            <span style="font-weight: 700; letter-spacing: 0.5px; color: #fff;">SEND ON WHATSAPP</span>
+                            style="flex: 1; background: linear-gradient(135deg, #60A5FA, #3B82F6); display: flex; align-items: center; justify-content: center; height: 50px; font-size: 1rem; border-radius: 14px; box-shadow: 0 10px 20px rgba(59, 130, 246, 0.3); border: 1px solid rgba(255,255,255,0.3);"
+                            onclick="toggleShareSheet()">
+                            <i data-lucide="share-2"
+                                style="margin-right:8px; width: 20px; height: 20px; color: #fff;"></i>
+                            <span style="font-weight: 700; letter-spacing: 0.5px; color: #fff;">SHARE</span>
                         </button>
                         <button class="btn-ghost"
                             style="width: 50px; height: 50px; display: flex; align-items: center; justify-content: center; border-radius: 14px; background: rgba(255, 255, 255, 0.5); border: 1px solid rgba(255, 255, 255, 0.4); backdrop-filter: blur(10px);"
@@ -367,47 +450,158 @@
                 </div>
             </div> <!-- End editor-tools -->
 
-        </div> <!-- End editor-view -->
-
-        <!-- Processing Overlay for Video Export -->
-        <div id="processing-overlay"
-            style="display: none; position: absolute; inset: 0; background: rgba(255, 255, 255, 0.4); z-index: 1000; flex-direction: column; align-items: center; justify-content: center; backdrop-filter: blur(25px);">
-            <div class="loader"
-                style="width: 50px; height: 50px; border: 4px solid rgba(255,255,255,0.3); border-top: 4px solid #60A5FA; border-radius: 50%; animation: spin 1s linear infinite;">
+            <!-- Share Sheet Overlay -->
+            <div id="share-sheet"
+                style="display: none; position: absolute; bottom: 0; left: 0; right: 0; z-index: 500; animation: slideUp 0.3s ease;">
+                <div
+                    style="background: rgba(255,255,255,0.95); backdrop-filter: blur(30px); border-radius: 24px 24px 0 0; padding: 24px 20px 40px; border-top: 1px solid rgba(255,255,255,0.5); box-shadow: 0 -10px 40px rgba(0,0,0,0.15);">
+                    <div
+                        style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                        <h3 style="font-weight: 800; color: #1e293b; font-size: 1.1rem;">Share Your Status</h3>
+                        <button onclick="toggleShareSheet()"
+                            style="background: none; border: none; cursor: pointer; padding: 5px;">
+                            <i data-lucide="x" style="width: 22px; height: 22px; color: #64748b;"></i>
+                        </button>
+                    </div>
+                    <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 15px; text-align: center;">
+                        <div onclick="shareToWhatsApp()" style="cursor: pointer;">
+                            <div
+                                style="width: 52px; height: 52px; border-radius: 16px; background: #25D366; display: flex; align-items: center; justify-content: center; margin: 0 auto 8px;">
+                                <svg width="26" height="26" viewBox="0 0 24 24" fill="white">
+                                    <path
+                                        d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
+                                </svg>
+                            </div>
+                            <span style="font-size: 0.7rem; color: #475569; font-weight: 600;">WhatsApp</span>
+                        </div>
+                        <div onclick="shareToInstagram()" style="cursor: pointer;">
+                            <div
+                                style="width: 52px; height: 52px; border-radius: 16px; background: linear-gradient(135deg, #f09433, #e6683c, #dc2743, #cc2366, #bc1888); display: flex; align-items: center; justify-content: center; margin: 0 auto 8px;">
+                                <svg width="26" height="26" viewBox="0 0 24 24" fill="white">
+                                    <path
+                                        d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z" />
+                                </svg>
+                            </div>
+                            <span style="font-size: 0.7rem; color: #475569; font-weight: 600;">Instagram</span>
+                        </div>
+                        <div onclick="shareToFacebook()" style="cursor: pointer;">
+                            <div
+                                style="width: 52px; height: 52px; border-radius: 16px; background: #1877F2; display: flex; align-items: center; justify-content: center; margin: 0 auto 8px;">
+                                <svg width="26" height="26" viewBox="0 0 24 24" fill="white">
+                                    <path
+                                        d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
+                                </svg>
+                            </div>
+                            <span style="font-size: 0.7rem; color: #475569; font-weight: 600;">Facebook</span>
+                        </div>
+                        <div onclick="shareToTelegram()" style="cursor: pointer;">
+                            <div
+                                style="width: 52px; height: 52px; border-radius: 16px; background: #0088cc; display: flex; align-items: center; justify-content: center; margin: 0 auto 8px;">
+                                <svg width="26" height="26" viewBox="0 0 24 24" fill="white">
+                                    <path
+                                        d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z" />
+                                </svg>
+                            </div>
+                            <span style="font-size: 0.7rem; color: #475569; font-weight: 600;">Telegram</span>
+                        </div>
+                        <div onclick="shareGeneric()" style="cursor: pointer;">
+                            <div
+                                style="width: 52px; height: 52px; border-radius: 16px; background: linear-gradient(135deg, #60A5FA, #818CF8); display: flex; align-items: center; justify-content: center; margin: 0 auto 8px;">
+                                <i data-lucide="more-horizontal" style="width: 26px; height: 26px; color: white;"></i>
+                            </div>
+                            <span style="font-size: 0.7rem; color: #475569; font-weight: 600;">More</span>
+                        </div>
+                    </div>
+                </div>
             </div>
-            <h3 style="margin-top: 20px; font-weight: 700; color: #1e293b;">Processing Video...</h3>
-            <p id="processing-status" style="margin-top: 8px; color: #64748b; font-size: 0.85rem;">Please
-                wait,
-                capturing frames</p>
 
-            <style>
-                @keyframes spin {
-                    0% {
-                        transform: rotate(0deg);
-                    }
+            <!-- End Share Sheet -->
+        </div>
 
-                    100% {
-                        transform: rotate(360deg);
-                    }
+        <!-- Subscription Payment Modal -->
+        <div id="payment-modal"
+            style="display: none; position: absolute; inset: 0; background: rgba(0,0,0,0.8); z-index: 2000; align-items: center; justify-content: center; backdrop-filter: blur(15px); padding: 20px;">
+            <div class="auth-card"
+                style="max-width: 400px; padding: 30px; text-align: center; border-radius: 28px; background: rgba(255,255,255,0.9);">
+                <div
+                    style="width: 60px; height: 60px; background: #fef3c7; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px;">
+                    <i data-lucide="crown" style="width: 30px; height: 30px; color: #f59e0b;"></i>
+                </div>
+                <h2 id="pay-plan-name" style="color: #1e293b; font-weight: 800; margin-bottom: 8px;">Upgrade to Pro</h2>
+                <p style="color: #64748b; font-size: 0.9rem; margin-bottom: 25px;">Unlimited shares & downloads.
+                    <br>One-time payment of <strong id="pay-amount" style="color: #1e293b;">₹0</strong>
+                </p>
+
+                <div id="upi-apps" style="display: flex; justify-content: center; gap: 15px; margin-bottom: 25px;">
+                    <a id="gpay-link" href="#" class="upi-app"><img src="https://testing-f88f0.web.app/gpay.png"
+                            style="width: 45px; height: 45px; border-radius: 12px; border: 1px solid #ddd;"
+                            alt="GPay"></a>
+                    <a id="phonepe-link" href="#" class="upi-app"><img src="https://testing-f88f0.web.app/phonepe.png"
+                            style="width: 45px; height: 45px; border-radius: 12px; border: 1px solid #ddd;"
+                            alt="PhonePe"></a>
+                    <a id="paytm-link" href="#" class="upi-app"><img src="https://testing-f88f0.web.app/paytm.png"
+                            style="width: 45px; height: 45px; border-radius: 12px; border: 1px solid #ddd;"
+                            alt="Paytm"></a>
+                </div>
+
+                <div
+                    style="background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 16px; padding: 15px; margin-bottom: 25px;">
+                    <p style="font-size: 0.75rem; color: #64748b; margin-bottom: 10px;">Already paid? Enter UTR /
+                        Transaction ID</p>
+                    <input type="text" id="txn-id-input" placeholder="e.g. 1234567890"
+                        style="width: 100%; padding: 12px; border-radius: 10px; border: 1px solid #cbd5e1; outline: none; text-align: center; font-weight: 600;">
+                </div>
+
+                <div style="display: flex; flex-direction: column; gap: 10px;">
+                    <button class="btn-primary" onclick="submitPayment()" style="width: 100%; height: 50px;">Verify
+                        Payment</button>
+                    <button class="btn-ghost" onclick="togglePaymentModal(false)"
+                        style="width: 100%; border: none;">Later</button>
+                </div>
+            </div>
+        </div>
+
+    </div> <!-- End editor-view -->
+
+    <!-- Processing Overlay for Video Export -->
+    <div id="processing-overlay"
+        style="display: none; position: absolute; inset: 0; background: rgba(255, 255, 255, 0.4); z-index: 1000; flex-direction: column; align-items: center; justify-content: center; backdrop-filter: blur(25px);">
+        <div class="loader"
+            style="width: 50px; height: 50px; border: 4px solid rgba(255,255,255,0.3); border-top: 4px solid #60A5FA; border-radius: 50%; animation: spin 1s linear infinite;">
+        </div>
+        <h3 style="margin-top: 20px; font-weight: 700; color: #1e293b;">Processing Video...</h3>
+        <p id="processing-status" style="margin-top: 8px; color: #64748b; font-size: 0.85rem;">Please
+            wait,
+            capturing frames</p>
+
+        <style>
+            @keyframes spin {
+                0% {
+                    transform: rotate(0deg);
                 }
-            </style>
+
+                100% {
+                    transform: rotate(360deg);
+                }
+            }
+        </style>
+    </div>
+
+    <!-- Hidden Global Elements -->
+    <input type="file" id="photo-upload" style="display: none;" accept="image/*">
+
+
+    <!-- Gallery View -->
+    <div id="gallery-view" class="view-container">
+        <header>
+            <button class="btn-ghost" onclick="hideGallery()"><i data-lucide="arrow-left"></i></button>
+            <h3>My Gallery</h3>
+            <button class="btn-ghost" onclick="clearGallery()"><i data-lucide="trash-2"></i></button>
+        </header>
+        <div id="gallery-grid" class="content-grid" style="padding-top: 20px;">
+            <!-- Saved designs will appear here -->
         </div>
-
-        <!-- Hidden Global Elements -->
-        <input type="file" id="photo-upload" style="display: none;" accept="image/*">
-
-
-        <!-- Gallery View -->
-        <div id="gallery-view" class="view-container">
-            <header>
-                <button class="btn-ghost" onclick="hideGallery()"><i data-lucide="arrow-left"></i></button>
-                <h3>My Gallery</h3>
-                <button class="btn-ghost" onclick="clearGallery()"><i data-lucide="trash-2"></i></button>
-            </header>
-            <div id="gallery-grid" class="content-grid" style="padding-top: 20px;">
-                <!-- Saved designs will appear here -->
-            </div>
-        </div>
+    </div>
     </div>
 
     <script src="script.js"></script>
